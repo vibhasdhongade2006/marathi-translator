@@ -1,0 +1,2084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="author" content="Chirag Patnaik">
+  <meta name="description" content="Anuvaad — English to 11 Indic languages, translation entirely in your browser via ONNX. No server, no API keys.">
+  <title>Anuvaad — Browser-Native English → Indic Translation</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E0%A4%85%3C/text%3E%3C/svg%3E">
+
+  <style>
+    /* Rangrez palette · india-04 · INDIGO/SAFFRON */
+    :root {
+      --gray-900: #111111;
+      --gray-800: #2a2630;
+      --gray-700: #4a4458;
+      --gray-600: #6c6478;
+      --gray-400: #a0a0a0;
+      --gray-200: #dad8df;
+      --gray-100: #f6f4f0;
+      --gray-50:  #ece9e2;
+      --white:    #fefdf9;
+      --indigo-500: #182069;
+      --indigo-600: #0f184e;
+      --indigo-100: #d8dbeb;
+      --saffron-500: #cc7a16;
+      --saffron-100: #fbe8c8;
+      --success-bg: #dceadb;
+      --success-border: #2a8a3a;
+      --success-text: #0a3014;
+      --loading-bg: #fde6c4;
+      --loading-border: #c08018;
+      --loading-text: #744210;
+      --error-bg: #f8d4dc;
+      --error-border: #b81848;
+      --error-text: #6a0a30;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-100);
+      color: var(--gray-800);
+      line-height: 1.6;
+      padding: 24px 16px 60px;
+    }
+
+    .app {
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 22px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--indigo-500);
+      letter-spacing: -0.01em;
+    }
+    h1 .devanagari {
+      color: var(--saffron-500);
+      font-weight: 800;
+      margin-right: 8px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 999px;
+      font-size: 13px;
+      color: var(--gray-700);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--gray-400);
+    }
+    .badge.loading { background: var(--loading-bg); color: var(--loading-text); border-color: var(--loading-border); }
+    .badge.loading .dot { background: var(--loading-border); animation: pulse 1.4s infinite; }
+    .badge.ready   { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
+    .badge.ready   .dot { background: var(--success-border); }
+    .badge.error   { background: var(--error-bg); color: var(--error-text); border-color: var(--error-border); }
+    .badge.error   .dot { background: var(--error-border); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .progress-card {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      display: none;
+    }
+    .progress-card.visible { display: block; }
+    .progress-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      color: var(--gray-700);
+      margin-bottom: 8px;
+    }
+    .progress-bar {
+      height: 8px;
+      background: var(--gray-50);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--indigo-500);
+      width: 0%;
+      transition: width 0.2s ease;
+    }
+
+    .card {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+    .label {
+      font-size: 13px;
+      color: var(--gray-600);
+      font-weight: 500;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .label .lang-name { color: var(--indigo-500); font-weight: 600; }
+
+    textarea {
+      width: 100%;
+      min-height: 90px;
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 16px;
+      font-family: inherit;
+      resize: vertical;
+      background: var(--gray-100);
+      color: var(--gray-900);
+    }
+    textarea:focus {
+      outline: 2px solid var(--indigo-500);
+      outline-offset: -1px;
+      background: var(--white);
+    }
+
+    .lang-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 6px;
+      margin-top: 12px;
+    }
+    .lang-btn {
+      padding: 8px 10px;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.1s;
+    }
+    .lang-btn:hover { border-color: var(--indigo-500); }
+    .lang-btn.active {
+      background: var(--indigo-500);
+      color: var(--white);
+      border-color: var(--indigo-500);
+    }
+    .lang-btn .native { font-weight: 600; display: block; }
+    .lang-btn .name { font-size: 11px; opacity: 0.7; }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 12px;
+    }
+    button {
+      padding: 10px 20px;
+      background: var(--indigo-500);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    button:hover:not(:disabled) { background: var(--indigo-600); }
+    button:disabled {
+      background: var(--gray-400);
+      cursor: not-allowed;
+    }
+    button.secondary {
+      background: var(--gray-50);
+      color: var(--gray-700);
+      border: 1px solid var(--gray-200);
+    }
+    button.secondary:hover:not(:disabled) {
+      background: var(--gray-100);
+      border-color: var(--gray-400);
+    }
+
+    .output {
+      min-height: 80px;
+      padding: 12px;
+      background: var(--gray-100);
+      border-radius: 8px;
+      font-size: 17px;
+      color: var(--gray-900);
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+    .output:empty::before {
+      content: "Translation will appear here…";
+      color: var(--gray-400);
+      font-style: italic;
+      font-size: 14px;
+    }
+
+    .meta {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--gray-600);
+    }
+
+    footer {
+      margin-top: 30px;
+      padding-top: 18px;
+      border-top: 1px solid var(--gray-200);
+      font-size: 13px;
+      color: var(--gray-600);
+      text-align: center;
+    }
+    footer a { color: var(--indigo-500); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    .error-msg {
+      padding: 10px 12px;
+      background: var(--error-bg);
+      color: var(--error-text);
+      border: 1px solid var(--error-border);
+      border-radius: 6px;
+      font-size: 13px;
+      margin-top: 10px;
+      display: none;
+    }
+    .error-msg.visible { display: block; }
+
+    .book-card { margin-top: 16px; }
+    .book-controls { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    .book-controls button { flex:1; min-width:130px; }
+    .book-note { color:var(--muted, #777); font-size:12px; line-height:1.5; margin-top:8px; }
+    #book-file { width:100%; margin-top:8px; }
+    #book-progress { font-size:13px; margin-top:10px; white-space:pre-wrap; }
+    #book-output { white-space:pre-wrap; max-height:320px; overflow:auto; font-size:14px; line-height:1.65; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1><span class="devanagari">अ</span>Anuvaad</h1>
+      <div id="badge" class="badge loading">
+        <span class="dot"></span>
+        <span id="status-text">Initialising…</span>
+      </div>
+    </header>
+
+    <div id="progress-card" class="progress-card">
+      <div class="progress-row">
+        <span id="progress-label">Downloading model…</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="label">
+        <span>English</span>
+        <span id="char-count" class="meta">0 chars</span>
+      </div>
+      <textarea id="input" placeholder="Type or paste English text here…">The Prime Minister addressed the nation yesterday evening.</textarea>
+      <div class="lang-row" id="lang-row"></div>
+      <div class="actions">
+        <button id="translate-btn" disabled>Translate</button>
+        <button id="copy-btn" class="secondary" disabled>Copy</button>
+      </div>
+      <div id="error-msg" class="error-msg"></div>
+    </div>
+
+    <div class="card">
+      <div class="label">
+        <span id="output-label" class="lang-name">हिन्दी (Hindi)</span>
+        <span id="time-meta" class="meta"></span>
+      </div>
+      <div id="output" class="output"></div>
+    </div>
+
+    <div class="card book-card">
+      <div class="label"><span>EPUB book (experimental)</span></div>
+      <input id="book-file" type="file" accept=".epub,application/epub+zip">
+      <div class="book-controls">
+        <button id="book-import" class="secondary" disabled>Read EPUB</button>
+        <button id="book-translate" disabled>Translate book</button>
+        <button id="book-stop" class="secondary" disabled>Stop (progress is kept)</button>
+        <label style="font-size:13px;color:var(--gray-600);display:inline-flex;align-items:center;gap:6px;">Batch
+          <select id="book-batch" style="padding:6px;border-radius:6px;border:1px solid var(--gray-200);">
+            <option value="4">4</option><option value="8" selected>8</option><option value="16">16</option>
+          </select>
+        </label>
+        <button id="book-save" class="secondary" disabled>Save Marathi TXT</button>
+        <button id="book-save-epub" disabled>Export Marathi EPUB</button>
+      </div>
+      <div class="book-note">Experimental EPUB translation. The Marathi EPUB keeps the source title/author when available, detected headings, chapter order, and a table of contents. Original images, cover art, and exact styling are not preserved yet. Large books may take a long time; keep this tab open. Files are processed in your browser and are not uploaded.</div>
+      <div id="speed-info" class="book-note"></div>
+      <div id="book-progress" aria-live="polite"></div>
+      <div id="book-output"></div>
+    </div>
+
+    <footer>
+      Translates English to 11 Indic languages, entirely in your browser. Model
+      downloads once (~1.3 GB) and is cached. No data leaves your device.
+      <br><br>
+      Built on
+      <a href="https://huggingface.co/ai4bharat/indictrans2-en-indic-dist-200M" target="_blank">AI4Bharat IndicTrans2 (en→indic, 200M)</a>
+      via
+      <a href="https://huggingface.co/naklitechie/indictrans2-en-indic-dist-200M-ONNX" target="_blank">naklitechie/…-ONNX</a>.
+      Source: <a href="https://github.com/prashnam/prashnam-voice/tree/main/browser-prep" target="_blank">prashnam/prashnam-voice</a>.
+    </footer>
+  </div>
+
+  <!-- ONNX Runtime Web (WASM/WebGPU backends) -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+
+  <script type="module">
+    /* ========================================================================
+     * indic_processor — inlined verbatim from
+     * github.com/prashnam/prashnam-voice / browser-prep/js/indic_processor.js
+     * Validated 528/528 vs Python IndicProcessor on 528 fixtures.
+     * ====================================================================== */
+/**
+ * indic_processor.js — JS port of AI4Bharat IndicTransToolkit's IndicProcessor.
+ *
+ * Two-stage wrapper around the IndicTrans2 model:
+ *   - preprocessBatch(batch, srcLang, tgtLang) → strings prefixed with FLORES tags,
+ *     punctuation-normalized, MosesTokenized (English source), with URLs / numerals
+ *     / emails / @-handles replaced by <ID{n}> placeholders. Placeholder maps
+ *     are pushed onto a per-instance FIFO queue.
+ *   - postprocessBatch(sents, lang) → drains the queue, fixes Perso-Arabic /
+ *     Oriya scripts, restores placeholders, transliterates from Devanagari to
+ *     the target script (the model's output is Devanagari-normalized for
+ *     non-Devanagari Indic languages), and trivial-detokenizes.
+ *
+ * Ported from IndicTransToolkit/processor.pyx (538 LOC) plus the four functions
+ * the Python class actually reaches in indic_nlp_library:
+ *   - UnicodeIndicTransliterator.transliterate (offset arithmetic on
+ *     SCRIPT_RANGES, with a Tamil-specific consonant collapse).
+ *   - indic_detokenize.trivial_detokenize (regex-based attach-left/right rules
+ *     + alternating-quote pairing).
+ *   - sacremoses MosesPunctNormalizer + MosesTokenizer + MosesDetokenizer for
+ *     the English source side. We ship a minimal, fixture-validated subset —
+ *     full sacremoses parity isn't necessary because SentencePiece (downstream)
+ *     handles the real tokenization; Moses just splits punctuation off so the
+ *     SPM merges line up with the AI4Bharat training distribution.
+ *
+ * Validated against fixtures/expected_processed.json (528 records over 11
+ * Indic languages × 4 fixture categories). Run js/indic_processor.test.js
+ * via Node to verify parity.
+ */
+
+// ---------------------------------------------------------------------------
+// Constants — data tables
+// ---------------------------------------------------------------------------
+
+// FLORES code → ISO 639-1 (or pseudo-code for trans-script aliases).
+// Verbatim from processor.pyx:59-94.
+const FLORES_TO_ISO = {
+  asm_Beng: "as", awa_Deva: "hi", ben_Beng: "bn", bho_Deva: "hi",
+  brx_Deva: "hi", doi_Deva: "hi", eng_Latn: "en", gom_Deva: "kK",
+  gon_Deva: "hi", guj_Gujr: "gu", hin_Deva: "hi", hne_Deva: "hi",
+  kan_Knda: "kn", kas_Arab: "ur", kas_Deva: "hi", kha_Latn: "en",
+  lus_Latn: "en", mag_Deva: "hi", mai_Deva: "hi", mal_Mlym: "ml",
+  mar_Deva: "mr", mni_Beng: "bn", mni_Mtei: "hi", npi_Deva: "ne",
+  ory_Orya: "or", pan_Guru: "pa", san_Deva: "hi", sat_Olck: "or",
+  snd_Arab: "ur", snd_Deva: "hi", tam_Taml: "ta", tel_Telu: "te",
+  urd_Arab: "ur", unr_Deva: "hi",
+};
+
+// ISO → [base codepoint, top codepoint]. From indicnlp/langinfo.py:14-29.
+const SCRIPT_RANGES = {
+  pa: [0x0a00, 0x0a7f],
+  gu: [0x0a80, 0x0aff],
+  or: [0x0b00, 0x0b7f],
+  ta: [0x0b80, 0x0bff],
+  te: [0x0c00, 0x0c7f],
+  kn: [0x0c80, 0x0cff],
+  ml: [0x0d00, 0x0d7f],
+  si: [0x0d80, 0x0dff],
+  hi: [0x0900, 0x097f],
+  mr: [0x0900, 0x097f],
+  kK: [0x0900, 0x097f],
+  sa: [0x0900, 0x097f],
+  ne: [0x0900, 0x097f],
+  sd: [0x0900, 0x097f],
+  bn: [0x0980, 0x09ff],
+  as: [0x0980, 0x09ff],
+};
+
+const COORDINATED_RANGE_START = 0x00;
+const COORDINATED_RANGE_END = 0x6f;
+
+// Indic digit codepoint → ASCII. From processor.pyx:99-140.
+const INDIC_DIGIT_MAP = {
+  // 0
+  "০": "0", "૦": "0", "೦": "0", "०": "0",
+  "٠": "0", "꯰": "0", "୦": "0", "੦": "0",
+  "᱐": "0", "۰": "0",
+  // 1
+  "১": "1", "૧": "1", "१": "1", "೧": "1",
+  "۱": "1", "꯱": "1", "୧": "1", "੧": "1",
+  "᱑": "1", "౧": "1",
+  // 2
+  "২": "2", "૨": "2", "२": "2", "೨": "2",
+  "۲": "2", "꯲": "2", "୨": "2", "੨": "2",
+  "᱒": "2", "౨": "2",
+  // 3
+  "৩": "3", "૩": "3", "३": "3", "೩": "3",
+  "۳": "3", "꯳": "3", "୩": "3", "੩": "3",
+  "᱓": "3", "౩": "3",
+  // 4
+  "৪": "4", "૪": "4", "४": "4", "೪": "4",
+  "۴": "4", "꯴": "4", "୪": "4", "੪": "4",
+  "᱔": "4", "౪": "4",
+  // 5
+  "৫": "5", "૫": "5", "५": "5", "೫": "5",
+  "۵": "5", "꯵": "5", "୫": "5", "੫": "5",
+  "᱕": "5", "౫": "5",
+  // 6
+  "৬": "6", "૬": "6", "६": "6", "೬": "6",
+  "۶": "6", "꯶": "6", "୬": "6", "੬": "6",
+  "᱖": "6", "౬": "6",
+  // 7
+  "৭": "7", "૭": "7", "७": "7", "೭": "7",
+  "۷": "7", "꯷": "7", "୭": "7", "੭": "7",
+  "᱗": "7", "౭": "7",
+  // 8
+  "৮": "8", "૮": "8", "८": "8", "೮": "8",
+  "۸": "8", "꯸": "8", "୮": "8", "੮": "8",
+  "᱘": "8", "౮": "8",
+  // 9
+  "৯": "9", "૯": "9", "९": "9", "೯": "9",
+  "۹": "9", "꯹": "9", "୯": "9", "੯": "9",
+  "᱙": "9", "౯": "9",
+};
+
+// Indic failure-case strings for placeholder mapping.
+// Verbatim from processor.pyx _INDIC_FAILURE_CASES.
+const INDIC_FAILURE_CASES = [
+  "آی ڈی ", "ꯑꯥꯏꯗꯤ", "आईडी", "आई . डी . ", "आई . डी .",
+  "आई. डी. ", "आई. डी.", "आय. डी. ", "आय. डी.",
+  "आय . डी . ", "आय . डी .आइ . डी . ", "आइ . डी .",
+  "आइ. डी. ", "आइ. डी.", "ऐटि", "آئی ڈی ", "ᱟᱭᱰᱤ ᱾",
+  "आयडी", "ऐडि", "आइडि", "ᱟᱭᱰᱤ",
+];
+
+// Punctuation replacements applied in order. From processor.pyx:_PUNC_REPLACEMENTS.
+// Mix of regex.replace + literal mapping.
+const PUNC_REPLACEMENTS = [
+  [/\r/g, ""],
+  [/\(\s*/g, "("],
+  [/\s*\)/g, ")"],
+  [/\s:\s?/g, ":"],
+  [/\s;\s?/g, ";"],
+  [/[`´‘‚’]/g, "'"],
+  [/[„“”«»]/g, '"'],
+  [/[–—]/g, "-"],
+  [/\.\.\./g, "..."],
+  [/ %/g, "%"],
+  [/nº /g, "nº "],
+  [/ ºC/g, " ºC"],
+  [/ [?!;]/g, (m) => m.trim()],
+  [/, /g, ", "],
+];
+
+// Patterns for placeholder masking. Order matters: EMAIL → URL → NUMERAL → OTHER.
+// Verbatim from processor.pyx _URL_PATTERN / _NUMERAL_PATTERN / _EMAIL_PATTERN /
+// _OTHER_PATTERN. Note the URL pattern uses a lookbehind — V8 / WebKit support
+// this since 2018 / 2020 respectively.
+const PATTERNS = {
+  email: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}/g,
+  url: /\b(?<![\w/.])(?:(?:https?|ftp):\/\/)?(?:(?:[\w-]+\.)+(?!\.))(?:[\w/\-?#&=%.]+)+(?!\.\w+)\b/g,
+  numeral: /(~?\d+\.?\d*\s?%?\s?-?\s?~?\d+\.?\d*\s?%|~?\d+%|\d+[-/.,:']\d+[-/.,:'+]\d+(?:\.\d+)?|\d+[-/.:'+]\d+(?:\.\d+)?)/g,
+  other: /[A-Za-z0-9]*[#|@]\w+/g,
+};
+
+// Cleanup regexes for _punc_norm.
+const MULTISPACE_REGEX = /[ ]{2,}/g;
+const END_BRACKET_SPACE_PUNC_REGEX = /\) ([.!:?;,])/g;
+const DIGIT_SPACE_PERCENT = /(\d) %/g;
+const DOUBLE_QUOT_PUNC = /"([,.]+)/g;
+const DIGIT_NBSP_DIGIT = /(\d) (\d)/g;
+
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Apply PUNC_REPLACEMENTS in sequence + cleanup regexes. Verbatim _punc_norm. */
+function puncNorm(text) {
+  for (const [pat, repl] of PUNC_REPLACEMENTS) {
+    text = text.replace(pat, repl);
+  }
+  text = text.replace(MULTISPACE_REGEX, " ");
+  text = text.replace(END_BRACKET_SPACE_PUNC_REGEX, ")$1");
+  text = text.replace(DIGIT_SPACE_PERCENT, "$1%");
+  text = text.replace(DOUBLE_QUOT_PUNC, '$1"');
+  text = text.replace(DIGIT_NBSP_DIGIT, "$1.$2");
+  return text.trim();
+}
+
+/** Translate Indic digits to ASCII via INDIC_DIGIT_MAP. */
+function normalizeDigits(text) {
+  let out = "";
+  for (const ch of text) {
+    out += INDIC_DIGIT_MAP[ch] ?? ch;
+  }
+  return out;
+}
+
+/**
+ * Wrap matched URL/EMAIL/NUMERAL/OTHER substrings with <ID{n}> placeholders.
+ * Returns [maskedText, placeholderMap]. The map contains MANY variants for
+ * each match (case, brackets, Indic-failure-prefix combos) so postprocessing
+ * can recover even if the SentencePiece re-encoding mangles the placeholder.
+ */
+function wrapWithPlaceholders(text) {
+  const map = {};
+  let serialNo = 1;
+  // Order: email → url → numeral → other (matches processor.pyx).
+  const orderedPatterns = [PATTERNS.email, PATTERNS.url, PATTERNS.numeral, PATTERNS.other];
+
+  for (const pattern of orderedPatterns) {
+    // Reset lastIndex on global regex; collect unique matches.
+    pattern.lastIndex = 0;
+    const matches = new Set();
+    let m;
+    while ((m = pattern.exec(text)) !== null) {
+      matches.add(m[0]);
+      if (m.index === pattern.lastIndex) pattern.lastIndex++;
+    }
+
+    for (const match of matches) {
+      // Length filters from processor.pyx:283-289.
+      if (pattern === PATTERNS.url) {
+        if (match.replace(/\./g, "").length < 4) continue;
+      }
+      if (pattern === PATTERNS.numeral) {
+        if (match.replace(/ /g, "").replace(/\./g, "").replace(/:/g, "").length < 4) continue;
+      }
+
+      const base = `<ID${serialNo}>`;
+
+      // Variants the postprocessor might encounter (model + tokenizer can mangle).
+      const variants = [
+        `<ID${serialNo}>`, `< ID${serialNo} >`, `[ID${serialNo}]`,
+        `[ ID${serialNo} ]`, `[ID ${serialNo}]`, `<ID${serialNo}]`,
+        `< ID${serialNo}]`, `<ID${serialNo} ]`,
+        `<id${serialNo}>`, `< id${serialNo} >`, `[id${serialNo}]`,
+        `[ id${serialNo} ]`, `[id ${serialNo}]`, `<id${serialNo}]`,
+        `< id${serialNo}]`, `<id${serialNo} ]`,
+      ];
+      for (const v of variants) map[v] = match;
+
+      // Indic-failure-case combinations (processor.pyx:316-328).
+      for (const fc of INDIC_FAILURE_CASES) {
+        const combos = [
+          `<${fc}${serialNo}>`, `< ${fc}${serialNo} >`, `< ${fc} ${serialNo} >`,
+          `<${fc} ${serialNo}]`, `< ${fc} ${serialNo} ]`,
+          `[${fc}${serialNo}]`, `[${fc} ${serialNo}]`,
+          `[ ${fc}${serialNo} ]`, `[ ${fc} ${serialNo} ]`,
+          `${fc} ${serialNo}`, `${fc}${serialNo}`,
+        ];
+        for (const c of combos) map[c] = match;
+      }
+
+      // Replace ALL occurrences of `match` with `base` (literal, not regex).
+      text = text.split(match).join(base);
+      serialNo += 1;
+    }
+  }
+
+  // Cleanup mirroring processor.pyx:332-333.
+  text = text.replace(/\s+/g, " ").replace(/>\//g, ">").replace(/]\//g, "]");
+  return [text, map];
+}
+
+/** Replace each placeholder variant in text with its original substring. */
+function restorePlaceholders(text, map) {
+  // Order: longer keys first so e.g. "<ID10>" is restored before "<ID1>".
+  // Then exact-match string replace (Python's .replace is literal).
+  const keys = Object.keys(map).sort((a, b) => b.length - a.length);
+  for (const k of keys) {
+    text = text.split(k).join(map[k]);
+  }
+  return text;
+}
+
+/**
+ * Minimal MosesPunctNormalizer port. Applies Unicode-quote / dash / ellipsis
+ * normalization that sacremoses's MosesPunctNormalizer does for English.
+ * Most of these are also handled by puncNorm; we keep this minimal because
+ * IndicProcessor calls _punc_norm BEFORE passing to MosesPunctNormalizer, so
+ * the input is already mostly clean.
+ */
+function mosesPunctNormalize(text) {
+  return text
+    .replace(/\r/g, "")
+    .replace(/\(/g, " (")
+    .replace(/\)/g, ") ")
+    .replace(/ +/g, " ")
+    .replace(/\) ([.!:?;,])/g, ")$1")
+    .replace(/\( /g, "(")
+    .replace(/ \)/g, ")")
+    .replace(/(\d) %/g, "$1%")
+    .replace(/ :/g, ":")
+    .replace(/ ;/g, ";")
+    .replace(/`/g, "'")
+    .replace(/''/g, '"')
+    .trim();
+}
+
+/**
+ * Minimal MosesTokenizer for English. Splits punctuation, English contractions
+ * (`'s`, `'re`, `'ll`, `'d`, `'m`, `'t`, `'ve`), and percent / currency signs
+ * off into separate space-delimited tokens. The SentencePiece tokenizer
+ * downstream handles the actual subword segmentation; this just inserts the
+ * spaces the AI4Bharat training distribution expects.
+ *
+ * Deliberately does NOT replicate sacremoses's protected-pattern logic
+ * (URLs, dates) — those get masked as <ID{n}> placeholders before we get
+ * here, so they're already single tokens.
+ */
+function mosesTokenize(text) {
+  // 1. Pad universal punctuation. Period is special-cased below because
+  //    sacremoses preserves decimal numbers (`7.2` stays `7.2`, not `7 . 2`).
+  text = text.replace(/([,!?;:()\[\]{}"%₹$€£¥<>=+|@#])/g, " $1 ");
+
+  // 2. Period: protect decimal points (digit.digit) before splitting.
+  text = text.replace(/(\d)\.(\d)/g, "$1@@DEC@@$2");
+  text = text.replace(/\./g, " . ");
+  text = text.replace(/@@DEC@@/g, ".");
+
+  // 3. English contractions: split common 'suffix forms. Sacremoses uses
+  //    \b(?=...) for these.
+  text = text.replace(/(\w)('s|'re|'ll|'d|'m|'t|'ve)\b/g, "$1 $2");
+
+  // 4. Collapse multispaces, trim.
+  return text.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Tamil-specific consonant-mapping correction. Tamil lacks voiced & aspirated
+ * plosives so we collapse the corresponding Devanagari range. Verbatim from
+ * indic_nlp_library/.../unicode_transliterate.py:_correct_tamil_mapping.
+ */
+function correctTamilMapping(offset) {
+  // Consonant rows 1-4 (varnamala): collapse voiced/aspirated to unvoiced
+  // unaspirated. Exception: ja (offset 0x1c) has a real Tamil mapping.
+  if (
+    offset >= 0x15 && offset <= 0x28 &&
+    offset !== 0x1c &&
+    !((offset - 0x15) % 5 === 0 || (offset - 0x15) % 5 === 4)
+  ) {
+    const subst = Math.floor((offset - 0x15) / 5);
+    offset = 0x15 + 5 * subst;
+  }
+  // Consonant row 5: collapse to pa.
+  if (offset === 0x2b || offset === 0x2c || offset === 0x2d) {
+    offset = 0x2a;
+  }
+  // sh → Sh
+  if (offset === 0x36) {
+    offset = 0x37;
+  }
+  return offset;
+}
+
+/**
+ * Transliterate text from one Brahmi-derived script to another via offset
+ * arithmetic on SCRIPT_RANGES. From unicode_transliterate.py:transliterate.
+ */
+function transliterate(text, fromIso, toIso) {
+  if (fromIso === toIso) return text;
+  const fromR = SCRIPT_RANGES[fromIso];
+  const toR = SCRIPT_RANGES[toIso];
+  if (!fromR || !toR) return text;
+
+  let out = "";
+  for (const ch of text) {
+    const cp = ch.codePointAt(0);
+    let offset = cp - fromR[0];
+    // Skip Devanagari danda / double-danda even if in the coordinated range.
+    if (
+      offset >= COORDINATED_RANGE_START &&
+      offset <= COORDINATED_RANGE_END &&
+      ch !== "।" &&
+      ch !== "॥"
+    ) {
+      if (toIso === "ta") offset = correctTamilMapping(offset);
+      out += String.fromCodePoint(toR[0] + offset);
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+/**
+ * Indic detokenizer. Verbatim port of indic_detokenize.trivial_detokenize_indic:
+ *   1. Glue number sequences ("1 , 2" → "1,2") via pat_num_seq
+ *   2. Attach left+right punctuation: "-/\\"
+ *   3. Attach left punctuation: "!%)\]},.:;>?।॥"
+ *   4. Attach right punctuation: "#$(\[{<@"
+ *   5. Alternate quote pairing for ', ", ` (right-attach first occurrence,
+ *      left-attach second, etc.)
+ */
+function trivialDetokenize(text /*, iso */) {
+  // 1. Number sequences
+  const patNumSeq = /([0-9]+ [,.:/] )+[0-9]+/g;
+  text = text.replace(patNumSeq, (m) => m.replace(/ /g, ""));
+
+  // 2-4. Attach rules
+  text = text.replace(/ ([\-/\\]) /g, "$1");          // lr_attach
+  text = text.replace(/ ([!%)\]},.:;>?।॥])/g, "$1"); // left_attach
+  text = text.replace(/([#$(\[{<@]) /g, "$1");        // right_attach
+
+  // 5. Alternating quote pairing
+  for (const punc of ["'", '"', "`"]) {
+    let cnt = 0;
+    let buf = "";
+    for (const c of text) {
+      if (c === punc) {
+        buf += cnt % 2 === 0 ? "@RA" : "@LA";
+        cnt += 1;
+      } else {
+        buf += c;
+      }
+    }
+    text = buf
+      .split(`@RA `).join(punc)
+      .split(` @LA`).join(punc)
+      .split("@RA").join(punc)
+      .split("@LA").join(punc);
+  }
+  return text;
+}
+
+
+// ---------------------------------------------------------------------------
+// IndicProcessor class
+// ---------------------------------------------------------------------------
+
+class IndicProcessor {
+  constructor({ inference = true } = {}) {
+    this.inference = inference;
+    /** FIFO queue of placeholder maps, populated by preprocess, drained by postprocess. */
+    this._queue = [];
+  }
+
+  // Reset per-call queue (single-translation contract).
+  resetQueue() { this._queue = []; }
+
+  _preprocess(sent, srcLang, tgtLang, isTarget) {
+    const isoLang = FLORES_TO_ISO[srcLang] ?? "hi";
+    const scriptPart = srcLang.split("_")[1];
+    const doTransliterate = !["Arab", "Aran", "Olck", "Mtei", "Latn"].includes(scriptPart);
+
+    // 1. Punctuation normalization
+    sent = puncNorm(sent);
+
+    // 2. Numerals + (if inference) placeholder masking
+    sent = normalizeDigits(sent);
+    if (this.inference) {
+      const [masked, map] = wrapWithPlaceholders(sent);
+      sent = masked;
+      this._queue.push(map);
+    }
+
+    // 3. English vs Indic path
+    let processed;
+    if (isoLang === "en") {
+      const stripped = sent.trim();
+      const normed = mosesPunctNormalize(stripped);
+      processed = mosesTokenize(normed);
+    } else {
+      // Indic source path (we don't fully use this for en→indic, but keep for
+      // x→en direction). Without porting per-script normalizers, just trivial
+      // tokenize; downstream SentencePiece handles real subword segmentation.
+      processed = sent.trim();
+      if (doTransliterate) {
+        processed = transliterate(processed, isoLang, "hi").replace(/ ् /g, "्");
+      }
+    }
+
+    processed = processed.trim();
+    return isTarget ? processed : `${srcLang} ${tgtLang} ${processed}`;
+  }
+
+  _postprocess(sent, lang, providedMap = null) {
+    if (Array.isArray(sent)) sent = sent[0];
+
+    const map = providedMap ?? this._queue.shift() ?? {};
+    const [langCode, scriptCode] = lang.split("_", 2);
+    const isoLang = FLORES_TO_ISO[lang] ?? "hi";
+
+    // Perso-Arabic fixups
+    if (scriptCode === "Arab" || scriptCode === "Aran") {
+      sent = sent
+        .replace(/ ؟/g, "؟")
+        .replace(/ ۔/g, "۔")
+        .replace(/ ،/g, "،")
+        .replace(/ٮ۪/g, "ؠ");
+    }
+
+    // Oriya fix
+    if (langCode === "ory") {
+      sent = sent.replace(/ଯ଼/g, "ୟ");
+    }
+
+    // Restore placeholders
+    sent = restorePlaceholders(sent, map);
+
+    // Detokenize
+    if (lang === "eng_Latn") {
+      // English target: defer to a minimal Moses-detok approximation.
+      return _mosesDetokenizeEnglish(sent.split(" "));
+    }
+    const xlated = transliterate(sent, "hi", isoLang);
+    return trivialDetokenize(xlated, isoLang);
+  }
+
+  preprocessBatch(batch, { srcLang, tgtLang = null, isTarget = false } = {}) {
+    if (typeof batch === "string") batch = [batch];
+    return batch.map((s) => this._preprocess(s, srcLang, tgtLang, isTarget));
+  }
+
+  postprocessBatch(sents, { lang = "hin_Deva", numReturnSequences = 1 } = {}) {
+    if (typeof sents === "string") sents = [sents];
+
+    // Drain N=ceil(len(sents)/numReturnSequences) maps off the queue first.
+    const numInputs = Math.floor(sents.length / numReturnSequences);
+    const maps = [];
+    for (let i = 0; i < numInputs; i++) {
+      maps.push(this._queue.shift() ?? {});
+    }
+
+    const out = [];
+    for (let i = 0; i < sents.length; i++) {
+      const mapIdx = Math.floor(i / numReturnSequences);
+      out.push(this._postprocess(sents[i], lang, maps[mapIdx] ?? {}));
+    }
+    // Mirror the upstream `self._placeholder_entity_maps.queue.clear()`
+    this._queue = [];
+    return out;
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// Minimal MosesDetokenizer for English target side. Mirror of trivialDetokenize
+// for English (attach-left/right rules + alternating quotes).
+// ---------------------------------------------------------------------------
+
+function _mosesDetokenizeEnglish(tokens) {
+  let text = tokens.join(" ");
+  // Attach left for terminal/sentence punctuation
+  text = text.replace(/ ([.,!?;:%)\]}>])/g, "$1");
+  // Attach right for opening brackets
+  text = text.replace(/([(\[{<]) /g, "$1");
+  // English contractions: word ' suffix → word'suffix
+  text = text.replace(/(\w) ('s|'re|'ll|'d|'m|'t|'ve)\b/g, "$1$2");
+  // Alternating quotes
+  for (const punc of ['"', "'"]) {
+    let cnt = 0;
+    let buf = "";
+    for (const c of text) {
+      if (c === punc) {
+        buf += cnt % 2 === 0 ? "@RA" : "@LA";
+        cnt += 1;
+      } else {
+        buf += c;
+      }
+    }
+    text = buf
+      .split(`@RA `).join(punc)
+      .split(` @LA`).join(punc)
+      .split("@RA").join(punc)
+      .split("@LA").join(punc);
+  }
+  return text.replace(/\s+/g, " ").trim();
+}
+
+
+// ---------------------------------------------------------------------------
+// Exports
+// ---------------------------------------------------------------------------
+
+    /* ========================================================================
+     * tokenizer — inlined from browser-prep/js/tokenizer.js
+     * ====================================================================== */
+/**
+ * tokenizer.js — minimal BPE tokenizer wrapper for the IT2 ONNX bundle.
+ *
+ * Loads the two tokenizer.json files (src + tgt) plus tokenizer_meta.json from
+ * an HF repo (or local path) and exposes:
+ *   - encodeSrc(text)    → Int32Array of input_ids (with extended-vocab IDs
+ *                          remapped to <unk>=3 so the encoder ONNX accepts them).
+ *   - decodeTgt(ids)     → string (skip_special_tokens=True, no
+ *                          clean_up_tokenization_spaces — matches the captured
+ *                          Python truth from `clean_up_tokenization_spaces=False`).
+ *
+ * Why a minimal port instead of @huggingface/transformers's AutoTokenizer:
+ *   1. AutoTokenizer assumes a single tokenizer.json; we have two.
+ *   2. Our tokenizers need the `>= dict_size → 3` remap on the encoder side
+ *      (see browser-prep/scripts/02_build_tokenizer.py). Wrapping AutoTokenizer
+ *      to inject that remap is more code than just running BPE here.
+ *
+ * Implements BPE encoding from `model.vocab` + `model.merges` per the HF
+ * tokenizers JSON spec, plus the four pipeline pieces our exporter wrote:
+ *   normalizer  → NFKC + collapse repeated whitespace
+ *   pre_tokenizer → Metaspace ('▁' replacement, prepend always)
+ *   model       → BPE
+ *   post_processor → TemplateProcessing  ($A </s>)
+ *   decoder     → Metaspace
+ * AddedTokens (special tokens + 33 language tags) match before BPE runs.
+ *
+ * Validated by tokenizer.test.js — encodes the same ID sequence as the Python
+ * fast tokenizer for our 15 SRC + 3 TGT parity fixtures.
+ */
+
+// ---------------------------------------------------------------------------
+// Loader
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a tokenizer pair from a base URL (local or HF). Fetches:
+ *   tokenizer_src.json, tokenizer_tgt.json, tokenizer_meta.json
+ */
+async function loadIT2Tokenizer(baseUrl) {
+  const trim = baseUrl.replace(/\/+$/, "");
+  const [src, tgt, meta] = await Promise.all([
+    fetch(`${trim}/tokenizer_src.json`).then((r) => r.json()),
+    fetch(`${trim}/tokenizer_tgt.json`).then((r) => r.json()),
+    fetch(`${trim}/tokenizer_meta.json`).then((r) => r.json()),
+  ]);
+  return new IT2Tokenizer(src, tgt, meta);
+}
+
+// ---------------------------------------------------------------------------
+// IT2Tokenizer
+// ---------------------------------------------------------------------------
+
+class IT2Tokenizer {
+  constructor(srcJson, tgtJson, meta) {
+    this.src = new BPETokenizer(srcJson);
+    this.tgt = new BPETokenizer(tgtJson);
+    this.meta = meta;          // { src_dict_size, tgt_dict_size, unk_id }
+  }
+
+  /**
+   * Encode a preprocessed source string (already prefixed with FLORES tags
+   * like "eng_Latn hin_Deva …"). Returns input_ids + attention_mask as
+   * regular arrays, with extended-vocab IDs remapped to <unk>.
+   */
+  encodeSrc(text) {
+    const ids = this.src.encode(text);
+    const dictSize = this.meta.src_dict_size;
+    const unk = this.meta.unk_id;
+    const safe = ids.map((i) => (i < dictSize ? i : unk));
+    return {
+      input_ids: safe,
+      attention_mask: new Array(safe.length).fill(1),
+    };
+  }
+
+  /** Decode a sequence of decoder output IDs. Drops specials, no cleanup. */
+  decodeTgt(ids) {
+    const dictSize = this.meta.tgt_dict_size;
+    const unk = this.meta.unk_id;
+    const safe = ids.map((i) => (i < dictSize ? i : unk));
+    return this.tgt.decode(safe, { skip_special_tokens: true });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// BPETokenizer — a vanilla port of just the tokenizer.json features we use.
+// ---------------------------------------------------------------------------
+
+class BPETokenizer {
+  constructor(json) {
+    this.json = json;
+    const m = json.model;
+    if (m.type !== "BPE") throw new Error(`Expected BPE model, got ${m.type}`);
+
+    // {token: id} from tokenizer.json. Used both for encoding (pieces → ids)
+    // and decoding (id → piece via reverse map below).
+    this.vocab = m.vocab;
+    this.idToToken = new Array(this._maxId() + 1);
+    for (const [tok, id] of Object.entries(this.vocab)) {
+      this.idToToken[id] = tok;
+    }
+
+    // Merges: array of [left, right] pairs OR space-separated strings.
+    // Lower index = earlier in BPE training = higher priority.
+    this.mergeRanks = new Map();
+    if (Array.isArray(m.merges)) {
+      m.merges.forEach((pair, idx) => {
+        const key = Array.isArray(pair) ? pair.join(" ") : pair;
+        this.mergeRanks.set(key, idx);
+      });
+    }
+
+    // AddedTokens — match in input before BPE runs. Sort by length desc so
+    // longer matches win (e.g. `eng_Latn` before any sub-token).
+    this.addedTokens = (json.added_tokens || []).slice()
+      .sort((a, b) => b.content.length - a.content.length);
+    this.addedTokenIds = new Set(this.addedTokens.map((t) => t.id));
+    this.specialIds = new Set(
+      this.addedTokens.filter((t) => t.special).map((t) => t.id),
+    );
+
+    // Normalizer — we only support Sequence([NFKC, Replace(" {2,}", " ")])
+    // which is what our 02_build_tokenizer.py produces.
+    this.normalizer = json.normalizer;
+
+    // Pre-tokenizer + decoder — we only support Metaspace.
+    this.preTokenizer = json.pre_tokenizer;
+    this.decoderSpec  = json.decoder;
+    this.replacement  = (this.preTokenizer && this.preTokenizer.replacement) || "▁";
+
+    // Post-processor — we support TemplateProcessing single="$A </s>".
+    this.postProcessor = json.post_processor;
+  }
+
+  _maxId() {
+    let max = 0;
+    for (const id of Object.values(this.vocab)) if (id > max) max = id;
+    for (const t of this.json.added_tokens || []) if (t.id > max) max = t.id;
+    return max;
+  }
+
+  /** Pipeline: normalize → addedToken split → metaspace pre-tok → BPE → post-proc. */
+  encode(text) {
+    text = this._normalize(text);
+    const chunks = this._splitOnAddedTokens(text);
+
+    const ids = [];
+    for (const chunk of chunks) {
+      if (typeof chunk === "number") {
+        ids.push(chunk);                  // an AddedToken id
+        continue;
+      }
+      // Metaspace pre-tokenize: replace spaces with ▁, prepend ▁ to start.
+      let pre = chunk.replace(/ /g, this.replacement);
+      if (this.preTokenizer && this.preTokenizer.prepend_scheme === "always") {
+        if (!pre.startsWith(this.replacement)) pre = this.replacement + pre;
+      }
+      // Pre-tokenizer in HF outputs one "word" per consecutive non-space run;
+      // for Metaspace with prepend_scheme=always, the entire chunk is one word.
+      // Apply BPE to each word separately:
+      const words = this._splitWords(pre);
+      for (const word of words) {
+        for (const id of this._bpeEncode(word)) ids.push(id);
+      }
+    }
+
+    return this._applyPostProcessor(ids);
+  }
+
+  _normalize(text) {
+    if (!this.normalizer) return text;
+    const apply = (norm) => {
+      if (norm.type === "Sequence") {
+        for (const sub of norm.normalizers) text = apply(sub) || text;
+        return text;
+      }
+      if (norm.type === "NFKC") return text.normalize("NFKC");
+      if (norm.type === "Replace") {
+        const pat = norm.pattern.Regex || norm.pattern.String || "";
+        const flags = norm.pattern.Regex ? "g" : "";
+        return text.replace(new RegExp(pat, flags), norm.content);
+      }
+      // Fallback: pass through
+      return text;
+    };
+    return apply(this.normalizer);
+  }
+
+  /** Split text into [string, addedTokenId, string, …] respecting lstrip/rstrip. */
+  _splitOnAddedTokens(text) {
+    if (!this.addedTokens.length) return [text];
+    // Build a regex matching any added token; prefer special tokens.
+    const escaped = this.addedTokens.map((t) =>
+      t.content.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    );
+    const re = new RegExp(`(${escaped.join("|")})`, "g");
+    const out = [];
+    let pos = 0;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const tok = this.addedTokens.find((t) => t.content === m[1]);
+      let pre  = text.slice(pos, m.index);
+      let post = "";
+      if (tok.lstrip) pre = pre.replace(/[ \t]+$/, "");
+      // We'll handle rstrip on the next pre by trimming its leading space.
+      if (pre.length) out.push(pre);
+      out.push(tok.id);
+      pos = m.index + m[1].length;
+      if (tok.rstrip) {
+        // consume leading whitespace of the next pre
+        while (pos < text.length && /[ \t]/.test(text[pos])) pos++;
+      }
+      void post;
+    }
+    if (pos < text.length) out.push(text.slice(pos));
+    return out;
+  }
+
+  /** A "word" for BPE is a metaspace-prefixed unit. Split on the replacement char. */
+  _splitWords(metaspaced) {
+    // Split on the replacement char but keep it as the leading char of each.
+    const out = [];
+    let cur = "";
+    for (const ch of metaspaced) {
+      if (ch === this.replacement) {
+        if (cur) out.push(cur);
+        cur = ch;
+      } else {
+        cur += ch;
+      }
+    }
+    if (cur) out.push(cur);
+    return out;
+  }
+
+  /** Standard BPE: greedy lowest-rank merge until no more merges apply. */
+  _bpeEncode(word) {
+    if (this.vocab.hasOwnProperty(word)) {
+      return [this.vocab[word]];
+    }
+    // Start with characters
+    let parts = Array.from(word);
+    while (parts.length > 1) {
+      let bestRank = Infinity;
+      let bestIdx = -1;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const key = parts[i] + " " + parts[i + 1];
+        const rank = this.mergeRanks.get(key);
+        if (rank !== undefined && rank < bestRank) {
+          bestRank = rank;
+          bestIdx = i;
+        }
+      }
+      if (bestIdx < 0) break;
+      parts = [
+        ...parts.slice(0, bestIdx),
+        parts[bestIdx] + parts[bestIdx + 1],
+        ...parts.slice(bestIdx + 2),
+      ];
+    }
+    // Map parts to ids; fall back to <unk> if missing.
+    const unkId = this._unkId();
+    return parts.map((p) => (this.vocab.hasOwnProperty(p) ? this.vocab[p] : unkId));
+  }
+
+  _unkId() {
+    return (this.json.model && this.json.model.unk_token &&
+            this.vocab[this.json.model.unk_token]) ?? 3;
+  }
+
+  _applyPostProcessor(ids) {
+    if (!this.postProcessor) return ids;
+    if (this.postProcessor.type !== "TemplateProcessing") return ids;
+    // Single template = "$A </s>"  → append the </s> id.
+    const out = ids.slice();
+    for (const piece of this.postProcessor.single || []) {
+      if (piece.SpecialToken) {
+        const stId = piece.SpecialToken.id;
+        const found = (this.postProcessor.special_tokens && this.postProcessor.special_tokens[stId]);
+        if (found) out.push(found.ids[0]);
+      }
+    }
+    return out;
+  }
+
+  /** Reverse the metaspace + drop specials. */
+  decode(ids, { skip_special_tokens = true } = {}) {
+    const tokens = [];
+    for (const id of ids) {
+      if (skip_special_tokens && this.specialIds.has(id)) continue;
+      const tok = this.idToToken[id];
+      if (tok !== undefined) tokens.push(tok);
+    }
+    let s = tokens.join("");
+    s = s.split(this.replacement).join(" ");
+    if (s.startsWith(" ")) s = s.slice(1);
+    return s;
+  }
+}
+
+    /* ========================================================================
+     * UI + ORT inference
+     * ====================================================================== */
+
+    const HF_REPO = "naklitechie/indictrans2-en-indic-dist-200M-ONNX";
+    const BASE = `https://huggingface.co/${HF_REPO}/resolve/main`;
+
+    // All 22 scheduled Indian languages IT2 supports. Three (Kashmiri,
+    // Manipuri, Sindhi) have two scripts each, expanded to separate buttons —
+    // so 25 entries. Ordered by speaker count, then alphabetic for the long tail.
+    const TARGET_LANGS = [
+      ["hin_Deva", "हिन्दी",       "Hindi"],
+      ["ben_Beng", "বাংলা",         "Bengali"],
+      ["tel_Telu", "తెలుగు",        "Telugu"],
+      ["mar_Deva", "मराठी",         "Marathi"],
+      ["tam_Taml", "தமிழ்",         "Tamil"],
+      ["urd_Arab", "اُردُو",        "Urdu"],
+      ["guj_Gujr", "ગુજરાતી",       "Gujarati"],
+      ["kan_Knda", "ಕನ್ನಡ",        "Kannada"],
+      ["ory_Orya", "ଓଡ଼ିଆ",         "Odia"],
+      ["mal_Mlym", "മലയാളം",       "Malayalam"],
+      ["pan_Guru", "ਪੰਜਾਬੀ",        "Punjabi"],
+      ["asm_Beng", "অসমীয়া",       "Assamese"],
+      ["mai_Deva", "मैथिली",        "Maithili"],
+      ["npi_Deva", "नेपाली",        "Nepali"],
+      ["san_Deva", "संस्कृतम्",     "Sanskrit"],
+      ["sat_Olck", "ᱥᱟᱱᱛᱟᱲᱤ",       "Santali"],
+      ["kas_Arab", "کأشُر",         "Kashmiri (Perso-Arabic)"],
+      ["kas_Deva", "कॉशुर",         "Kashmiri (Devanagari)"],
+      ["snd_Arab", "سنڌي",          "Sindhi (Perso-Arabic)"],
+      ["snd_Deva", "सिन्धी",        "Sindhi (Devanagari)"],
+      ["mni_Beng", "মৈতৈলোন্",      "Manipuri (Bangla)"],
+      ["mni_Mtei", "ꯃꯩꯇꯩꯂꯣꯟ",       "Manipuri (Meitei)"],
+      ["gom_Deva", "कोंकणी",        "Konkani"],
+      ["doi_Deva", "डोगरी",         "Dogri"],
+      ["brx_Deva", "बर'",           "Bodo"],
+    ];
+
+    const NUM_LAYERS = 18;
+    const NUM_HEADS = 8;
+    const HEAD_DIM = 64;
+    const KV_KINDS = ["decoder.key", "decoder.value", "encoder.key", "encoder.value"];
+    const DECODER_START_ID = 2;
+    const EOS_ID = 2;
+    const MAX_NEW_TOKENS = 128;
+
+    // --- DOM -------------------------------------------------------------
+    const $ = (id) => document.getElementById(id);
+    const $input = $("input"), $output = $("output"), $charCount = $("char-count");
+    const $translate = $("translate-btn"), $copy = $("copy-btn");
+    const $badge = $("badge"), $statusText = $("status-text");
+    const $progress = $("progress-card"), $pFill = $("progress-fill"), $pLabel = $("progress-label"), $pPct = $("progress-pct");
+    const $errorMsg = $("error-msg"), $outputLabel = $("output-label"), $timeMeta = $("time-meta");
+    const $langRow = $("lang-row");
+
+    // --- State -----------------------------------------------------------
+    let ip, tok, encSess, decSess, decpSess;
+    let currentLang = "hin_Deva";
+    let modelReady = false;
+    let translating = false;
+
+    // --- Lang picker UI --------------------------------------------------
+    for (const [code, native, name] of TARGET_LANGS) {
+      const btn = document.createElement("button");
+      btn.className = "lang-btn" + (code === currentLang ? " active" : "");
+      btn.dataset.code = code;
+      btn.dataset.native = native;
+      btn.dataset.name = name;
+      btn.innerHTML = `<span class="native">${native}</span><span class="name">${name}</span>`;
+      btn.onclick = () => {
+        currentLang = code;
+        document.querySelectorAll(".lang-btn").forEach((b) => b.classList.toggle("active", b.dataset.code === code));
+        $outputLabel.textContent = `${native} (${name})`;
+        if (modelReady && $input.value.trim()) doTranslate();
+      };
+      $langRow.appendChild(btn);
+    }
+
+    // --- Status helpers --------------------------------------------------
+    function setStatus(state, text) {
+      $badge.className = `badge ${state}`;
+      $statusText.textContent = text;
+    }
+    function showError(msg) {
+      $errorMsg.textContent = msg;
+      $errorMsg.classList.add("visible");
+    }
+    function clearError() { $errorMsg.classList.remove("visible"); }
+
+    // --- Char counter ----------------------------------------------------
+    $input.addEventListener("input", () => {
+      $charCount.textContent = `${$input.value.length} chars`;
+    });
+    $charCount.textContent = `${$input.value.length} chars`;
+
+    // --- Fetch with progress + IndexedDB caching ------------------------
+    // HF Hub returns 302 → fresh signed S3 URL on every request, so the
+    // browser HTTP cache (URL-keyed) misses every visit. Cache Storage API
+    // also rejects our largest entries with "Unexpected internal error"
+    // (Chromium's per-entry limit). IndexedDB stores 500MB+ Blobs reliably.
+    const IDB_NAME = "anuvaad-model-cache";
+    const IDB_STORE = "files";
+
+    function _idbOpen() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(IDB_STORE)) {
+            db.createObjectStore(IDB_STORE, { keyPath: "url" });
+          }
+        };
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = (e) => reject(e.target.error);
+      });
+    }
+    async function _idbGet(db, url) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, "readonly");
+        const req = tx.objectStore(IDB_STORE).get(url);
+        req.onsuccess = (e) => resolve(e.target.result || null);
+        req.onerror = (e) => reject(e.target.error);
+      });
+    }
+    async function _idbPut(db, url, blob) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        const req = tx.objectStore(IDB_STORE).put({ url, blob });
+        req.onsuccess = () => resolve();
+        req.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    async function fetchWithProgress(url, onProgress) {
+      // IndexedDB hit?
+      let db = null;
+      try { db = await _idbOpen(); } catch { /* private mode / no IDB */ }
+      if (db) {
+        try {
+          const row = await _idbGet(db, url);
+          if (row && row.blob) {
+            onProgress(1.0);
+            return new Uint8Array(await row.blob.arrayBuffer());
+          }
+        } catch (e) { console.warn("idb get failed:", e); }
+      }
+      // Miss — fetch with progress streaming.
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`HTTP ${r.status} fetching ${url}`);
+      const total = +r.headers.get("Content-Length") || 0;
+      const reader = r.body.getReader();
+      const chunks = [];
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (total) onProgress(received / total);
+      }
+      const buf = new Uint8Array(received);
+      let off = 0;
+      for (const c of chunks) { buf.set(c, off); off += c.length; }
+      // Persist for next visit. Store as Blob — IDB handles 500MB+ reliably.
+      if (db) {
+        try { await _idbPut(db, url, new Blob([buf])); }
+        catch (e) { console.warn("idb put failed:", e); }
+      }
+      return buf;
+    }
+
+    // --- Load all artifacts ----------------------------------------------
+    async function loadModel() {
+      // ORT-Web env: pin WASM paths to a CDN, prefer threaded if available
+      ort.env.wasm.numThreads = (typeof crossOriginIsolated !== "undefined" && crossOriginIsolated)
+        ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
+      ort.env.wasm.simd = true;
+
+      const files = [
+        { name: "encoder_model.onnx",            mb: 2 },
+        { name: "encoder_model.onnx.data",       mb: 280 },
+        { name: "decoder_model.onnx",            mb: 4 },
+        { name: "decoder_model.onnx.data",       mb: 530 },
+        { name: "decoder_with_past_model.onnx",  mb: 3 },
+        { name: "decoder_with_past_model.onnx.data", mb: 495 },
+        { name: "tokenizer_src.json", mb: 4 },
+        { name: "tokenizer_tgt.json", mb: 17 },
+        { name: "tokenizer_meta.json", mb: 0 },
+      ];
+      const totalMb = files.reduce((s, f) => s + f.mb, 0);
+      let downloadedMb = 0;
+
+      const buffers = {};
+      for (const f of files) {
+        $pLabel.textContent = `Downloading ${f.name}…`;
+        const buf = await fetchWithProgress(`${BASE}/${f.name}`, (frac) => {
+          const cur = downloadedMb + frac * f.mb;
+          $pFill.style.width = (100 * cur / totalMb).toFixed(1) + "%";
+          $pPct.textContent  = (100 * cur / totalMb).toFixed(0) + "%";
+        });
+        buffers[f.name] = buf;
+        downloadedMb += f.mb;
+        $pFill.style.width = (100 * downloadedMb / totalMb).toFixed(1) + "%";
+      }
+
+      // Build tokenizer
+      const dec = new TextDecoder();
+      const srcJson  = JSON.parse(dec.decode(buffers["tokenizer_src.json"]));
+      const tgtJson  = JSON.parse(dec.decode(buffers["tokenizer_tgt.json"]));
+      const metaJson = JSON.parse(dec.decode(buffers["tokenizer_meta.json"]));
+      tok = new IT2Tokenizer(srcJson, tgtJson, metaJson);
+      ip  = new IndicProcessor({ inference: true });
+
+      // Build ORT sessions with external-data sidecars.
+      $pLabel.textContent = "Initialising encoder session…";
+      encSess = await ort.InferenceSession.create(buffers["encoder_model.onnx"], {
+        externalData: [{ data: buffers["encoder_model.onnx.data"], path: "encoder_model.onnx.data" }],
+        executionProviders: ["wasm"],
+      });
+
+      $pLabel.textContent = "Initialising decoder session…";
+      decSess = await ort.InferenceSession.create(buffers["decoder_model.onnx"], {
+        externalData: [{ data: buffers["decoder_model.onnx.data"], path: "decoder_model.onnx.data" }],
+        executionProviders: ["wasm"],
+      });
+
+      $pLabel.textContent = "Initialising decoder-with-past session…";
+      decpSess = await ort.InferenceSession.create(buffers["decoder_with_past_model.onnx"], {
+        externalData: [{ data: buffers["decoder_with_past_model.onnx.data"], path: "decoder_with_past_model.onnx.data" }],
+        executionProviders: ["wasm"],
+      });
+
+      $pFill.style.width = "100%";
+      $pPct.textContent = "100%";
+      modelReady = true;
+      $translate.disabled = false;
+      $bookTranslate.disabled = !bookBlocks.length;
+      setStatus("ready", "Ready · running locally");
+      setTimeout(() => $progress.classList.remove("visible"), 1500);
+    }
+
+    // --- Greedy decode loop ----------------------------------------------
+    async function greedyTranslate(srcText, tgtLang) {
+      // 1. Preprocess (English → tagged + Moses-tokenized + placeholders)
+      ip.resetQueue();
+      const [pre] = ip.preprocessBatch(srcText, { srcLang: "eng_Latn", tgtLang });
+
+      // 2. Tokenize → encoder input
+      const { input_ids, attention_mask } = tok.encodeSrc(pre);
+      const B = 1, S = input_ids.length;
+      const encInputIds = new ort.Tensor("int64", BigInt64Array.from(input_ids.map(BigInt)), [B, S]);
+      const encAttnMask = new ort.Tensor("int64", BigInt64Array.from(attention_mask.map(BigInt)), [B, S]);
+
+      // 3. Encoder
+      const encOut = await encSess.run({ input_ids: encInputIds, attention_mask: encAttnMask });
+      const encH = encOut.last_hidden_state;
+
+      // 4. Step 1: decoder_model with [BOS]
+      const outTokens = [DECODER_START_ID];
+      let curId = BigInt64Array.from([BigInt(DECODER_START_ID)]);
+      let feed = {
+        input_ids: new ort.Tensor("int64", curId, [1, 1]),
+        encoder_attention_mask: encAttnMask,
+        encoder_hidden_states: encH,
+      };
+      let stepOut = await decSess.run(feed);
+      let logits = stepOut.logits;
+      let nextId = greedyArgmax(logits.data, logits.dims);
+      outTokens.push(nextId);
+
+      // 5. Steps 2..N with decoder_with_past
+      let presents = collectPresents(stepOut, "present");
+      while (nextId !== EOS_ID && outTokens.length < MAX_NEW_TOKENS + 1) {
+        const stepFeed = {
+          input_ids: new ort.Tensor("int64", BigInt64Array.from([BigInt(nextId)]), [1, 1]),
+          encoder_attention_mask: encAttnMask,
+        };
+        for (let i = 0; i < NUM_LAYERS; i++) {
+          for (let j = 0; j < KV_KINDS.length; j++) {
+            stepFeed[`past_key_values.${i}.${KV_KINDS[j]}`] = presents[i * 4 + j];
+          }
+        }
+        stepOut = await decpSess.run(stepFeed);
+        logits = stepOut.logits;
+        nextId = greedyArgmax(logits.data, logits.dims);
+        outTokens.push(nextId);
+        presents = collectPresents(stepOut, "present");
+        // yield to UI every few tokens
+        if (outTokens.length % 8 === 0) await new Promise((r) => setTimeout(r, 0));
+      }
+
+      // 6. Decode → postprocess
+      const rawText = tok.decodeTgt(outTokens);
+      const [final] = ip.postprocessBatch(rawText, { lang: tgtLang });
+      return { final, raw: rawText, tokens: outTokens };
+    }
+
+    // --- Batched greedy decode (several passages per model call) ----------
+    // Much faster than one-at-a-time: each decoder step does the same fixed
+    // work whether it carries 1 sequence or 8, so throughput goes up a lot.
+    const PAD_ID = 1;
+    async function greedyTranslateBatch(srcTexts, tgtLang) {
+      const B = srcTexts.length;
+      ip.resetQueue();
+      const pres = ip.preprocessBatch(srcTexts, { srcLang: "eng_Latn", tgtLang });
+      const encs = pres.map((t) => tok.encodeSrc(t));
+      const S = Math.max(...encs.map((e) => e.input_ids.length));
+
+      const ids = new BigInt64Array(B * S).fill(BigInt(PAD_ID));
+      const mask = new BigInt64Array(B * S); // zeros = padding
+      encs.forEach((e, b) => {
+        e.input_ids.forEach((v, i) => { ids[b * S + i] = BigInt(v); mask[b * S + i] = 1n; });
+      });
+      const encAttnMask = new ort.Tensor("int64", mask, [B, S]);
+      const encOut = await encSess.run({
+        input_ids: new ort.Tensor("int64", ids, [B, S]),
+        attention_mask: encAttnMask,
+      });
+      const encH = encOut.last_hidden_state;
+
+      const rows = Array.from({ length: B }, () => [DECODER_START_ID]);
+      const done = new Array(B).fill(false);
+      const truncated = new Array(B).fill(false);
+
+      const pick = (logits) => {
+        const [LB, T, V] = logits.dims, d = logits.data, next = new Array(LB);
+        for (let b = 0; b < LB; b++) {
+          const off = b * T * V + (T - 1) * V;
+          let best = -Infinity, bi = 0;
+          for (let i = 0; i < V; i++) { const v = d[off + i]; if (v > best) { best = v; bi = i; } }
+          next[b] = bi;
+        }
+        return next;
+      };
+      const record = (next) => {
+        for (let b = 0; b < B; b++) {
+          if (done[b]) continue;
+          rows[b].push(next[b]);
+          if (next[b] === EOS_ID) done[b] = true;
+        }
+      };
+
+      let stepOut = await decSess.run({
+        input_ids: new ort.Tensor("int64", new BigInt64Array(B).fill(BigInt(DECODER_START_ID)), [B, 1]),
+        encoder_attention_mask: encAttnMask,
+        encoder_hidden_states: encH,
+      });
+      let next = pick(stepOut.logits);
+      record(next);
+      let presents = collectPresents(stepOut, "present");
+
+      let steps = 1;
+      while (done.some((d) => !d) && steps < MAX_NEW_TOKENS) {
+        const feedIds = new BigInt64Array(B);
+        for (let b = 0; b < B; b++) feedIds[b] = BigInt(done[b] ? PAD_ID : next[b]);
+        const stepFeed = {
+          input_ids: new ort.Tensor("int64", feedIds, [B, 1]),
+          encoder_attention_mask: encAttnMask,
+        };
+        for (let i = 0; i < NUM_LAYERS; i++)
+          for (let j = 0; j < KV_KINDS.length; j++)
+            stepFeed[`past_key_values.${i}.${KV_KINDS[j]}`] = presents[i * 4 + j];
+        stepOut = await decpSess.run(stepFeed);
+        next = pick(stepOut.logits);
+        record(next);
+        presents = collectPresents(stepOut, "present");
+        steps++;
+        if (steps % 8 === 0) await new Promise((r) => setTimeout(r, 0));
+      }
+      for (let b = 0; b < B; b++) if (!done[b]) truncated[b] = true;
+
+      const raws = rows.map((r) => tok.decodeTgt(r));
+      const finals = ip.postprocessBatch(raws, { lang: tgtLang });
+      return finals.map((f, b) => ({ final: f, truncated: truncated[b] }));
+    }
+
+    function collectPresents(out, prefix) {
+      // Output naming: ${prefix}.{i}.{decoder|encoder}.{key|value}
+      const arr = new Array(NUM_LAYERS * 4);
+      for (let i = 0; i < NUM_LAYERS; i++) {
+        for (let j = 0; j < KV_KINDS.length; j++) {
+          arr[i * 4 + j] = out[`${prefix}.${i}.${KV_KINDS[j]}`];
+        }
+      }
+      return arr;
+    }
+
+    function greedyArgmax(data, dims) {
+      // logits shape: [B, T, V]; we want argmax over last position last dim
+      const [B, T, V] = dims;
+      const lastOff = (B - 1) * T * V + (T - 1) * V;
+      let best = -Infinity;
+      let bestIdx = 0;
+      for (let i = 0; i < V; i++) {
+        const v = data[lastOff + i];
+        if (v > best) { best = v; bestIdx = i; }
+      }
+      return bestIdx;
+    }
+
+    // --- Translate handler -----------------------------------------------
+    async function doTranslate() {
+      if (!modelReady || translating) return;
+      const text = $input.value.trim();
+      if (!text) return;
+      translating = true;
+      clearError();
+      $translate.disabled = true;
+      $copy.disabled = true;
+      setStatus("loading", "Translating…");
+      $output.textContent = "";
+      $timeMeta.textContent = "";
+      const t0 = performance.now();
+      try {
+        const { final, tokens } = await greedyTranslate(text, currentLang);
+        const elapsed = (performance.now() - t0) / 1000;
+        $output.textContent = final;
+        $timeMeta.textContent = `${tokens.length} tokens · ${elapsed.toFixed(1)}s`;
+        $copy.disabled = false;
+        setStatus("ready", "Ready · running locally");
+      } catch (e) {
+        showError("Translation failed: " + e.message);
+        setStatus("error", "Error");
+        console.error(e);
+      } finally {
+        translating = false;
+        $translate.disabled = false;
+      }
+    }
+
+    $translate.addEventListener("click", doTranslate);
+    $input.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") doTranslate();
+    });
+    $copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText($output.textContent);
+        const orig = $copy.textContent;
+        $copy.textContent = "Copied!";
+        setTimeout(() => { $copy.textContent = orig; }, 1200);
+      } catch {}
+    });
+
+    // --- Experimental EPUB reader / plain-text Marathi export -------------
+    // Reads ZIP entries using the browser's built-in DecompressionStream.
+    // This avoids adding another third-party library or uploading book files.
+    const $bookFile = $("book-file"), $bookImport = $("book-import");
+    const $bookTranslate = $("book-translate"), $bookSave = $("book-save");
+    const $bookSaveEpub = $("book-save-epub");
+    const $bookProgress = $("book-progress"), $bookOutput = $("book-output");
+    let bookBlocks = [], translatedBook = "", translatedBookBlocks = [], bookBusy = false;
+    let bookMetadata = { title: "", author: "" };
+    $bookFile.addEventListener("change", () => {
+      const f = $bookFile.files?.[0];
+      $bookImport.disabled = !f || !f.name.toLowerCase().endsWith(".epub");
+      $bookTranslate.disabled = true; $bookSave.disabled = true; $bookSaveEpub.disabled = true;
+      $bookProgress.textContent = ""; $bookOutput.textContent = "";
+      bookBlocks = []; translatedBook = ""; translatedBookBlocks = []; bookMetadata = { title: "", author: "" };
+    });
+
+    async function inflateRaw(bytes) {
+      if (typeof DecompressionStream === "undefined") throw new Error("This browser does not support EPUB decompression. Try the latest Chrome or Edge.");
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    }
+    async function readZipEntries(arrayBuffer) {
+      const bytes = new Uint8Array(arrayBuffer), view = new DataView(arrayBuffer);
+      let eocd = -1;
+      for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65558); i--) {
+        if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+      }
+      if (eocd < 0) throw new Error("This file doesn't look like a valid EPUB/ZIP archive.");
+      const count = view.getUint16(eocd + 10, true), centralOffset = view.getUint32(eocd + 16, true);
+      const decoder = new TextDecoder("utf-8"), entries = new Map(); let pos = centralOffset;
+      for (let n = 0; n < count; n++) {
+        if (view.getUint32(pos, true) !== 0x02014b50) throw new Error("Could not read EPUB file list.");
+        const method = view.getUint16(pos + 10, true), compressedSize = view.getUint32(pos + 20, true);
+        const nameLen = view.getUint16(pos + 28, true), extraLen = view.getUint16(pos + 30, true), commentLen = view.getUint16(pos + 32, true);
+        const localOffset = view.getUint32(pos + 42, true);
+        const name = decoder.decode(bytes.slice(pos + 46, pos + 46 + nameLen));
+        const localNameLen = view.getUint16(localOffset + 26, true), localExtraLen = view.getUint16(localOffset + 28, true);
+        const dataStart = localOffset + 30 + localNameLen + localExtraLen;
+        const compressed = bytes.slice(dataStart, dataStart + compressedSize);
+        let content;
+        if (method === 0) content = compressed;
+        else if (method === 8) content = await inflateRaw(compressed);
+        else { pos += 46 + nameLen + extraLen + commentLen; continue; }
+        entries.set(name, decoder.decode(content));
+        pos += 46 + nameLen + extraLen + commentLen;
+      }
+      return entries;
+    }
+    function normalPath(path) {
+      const parts = [];
+      for (const p of path.split("/")) { if (!p || p === ".") continue; if (p === "..") parts.pop(); else parts.push(p); }
+      return parts.join("/");
+    }
+    function getEpubTextBlocks(xhtml) {
+      const doc = new DOMParser().parseFromString(xhtml, "application/xhtml+xml");
+      if (doc.querySelector("parsererror")) return [];
+      const blocks = [];
+      const nodes = doc.querySelectorAll("h1,h2,h3,h4,h5,h6,p,blockquote,li,figcaption");
+      for (const node of nodes) {
+        // Avoid capturing nested list/paragraph content more than once.
+        if (["P","LI","BLOCKQUOTE","FIGCAPTION"].includes(node.tagName) && node.querySelector("p,li,blockquote")) continue;
+        const text = (node.textContent || "").replace(/\s+/g, " ").trim();
+        if (!text) continue;
+        const isHeading = /^H[1-6]$/.test(node.tagName);
+        blocks.push({ text, heading: isHeading, tag: node.tagName.toLowerCase() });
+      }
+      return blocks;
+    }
+    $bookImport.addEventListener("click", async () => {
+      const file = $bookFile.files?.[0]; if (!file || bookBusy) return;
+      $bookImport.disabled = true; $bookProgress.textContent = "Reading EPUB…";
+      try {
+        const entries = await readZipEntries(await file.arrayBuffer());
+        const container = entries.get("META-INF/container.xml");
+        if (!container) throw new Error("EPUB container.xml was not found.");
+        const cdoc = new DOMParser().parseFromString(container, "application/xml");
+        const opfPath = cdoc.querySelector("rootfile")?.getAttribute("full-path");
+        if (!opfPath || !entries.has(opfPath)) throw new Error("Could not find the EPUB book package (OPF).");
+        const opf = new DOMParser().parseFromString(entries.get(opfPath), "application/xml");
+        const dcTitle = opf.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", "title")[0]?.textContent?.trim();
+        const dcCreator = opf.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", "creator")[0]?.textContent?.trim();
+        bookMetadata = {
+          title: dcTitle || file.name.replace(/\.epub$/i, ""),
+          author: dcCreator || ""
+        };
+        const manifest = new Map();
+        for (const item of opf.querySelectorAll("manifest item")) manifest.set(item.getAttribute("id"), item.getAttribute("href"));
+        const base = opfPath.includes("/") ? opfPath.slice(0, opfPath.lastIndexOf("/") + 1) : "";
+        const spine = [...opf.querySelectorAll("spine itemref")];
+        const found = [];
+        for (const ref of spine) {
+          const href = manifest.get(ref.getAttribute("idref")); if (!href) continue;
+          const path = normalPath(base + decodeURIComponent(href.split("#")[0]));
+          const chapter = entries.get(path); if (!chapter) continue;
+          const blocks = getEpubTextBlocks(chapter);
+          if (blocks.length) { found.push({ text: "", heading: true, chapterBreak: true }); found.push(...blocks); }
+        }
+        bookBlocks = found.filter((b, i) => !(b.chapterBreak && (i === found.length - 1 || !found[i+1]?.text)));
+        if (!bookBlocks.length) throw new Error("No readable chapter text was found. This may be a scanned/image-only EPUB or an unusual layout.");
+        $bookProgress.textContent = `Imported “${bookMetadata.title}”${bookMetadata.author ? ` by ${bookMetadata.author}` : ""}: ${bookBlocks.filter(b => !b.chapterBreak).length} text blocks. Title and author will be kept in the translated EPUB.`;
+        $bookTranslate.disabled = !modelReady;
+      } catch (e) { $bookProgress.textContent = "EPUB import failed: " + e.message; console.error(e); }
+      finally { $bookImport.disabled = false; }
+    });
+
+    // Slightly larger passages reduce repeated encoder/setup overhead.
+    // If a passage reaches the decoder's output cap, it is split and retried
+    // so the speed change does not silently leave a truncated translation.
+    function splitForTranslation(text, maxChars = 460) {
+      const pieces = []; let rest = text.trim();
+      while (rest.length > maxChars) {
+        let cut = Math.max(rest.lastIndexOf(". ", maxChars), rest.lastIndexOf("? ", maxChars), rest.lastIndexOf("! ", maxChars), rest.lastIndexOf("; ", maxChars));
+        if (cut < Math.floor(maxChars * 0.55)) cut = rest.lastIndexOf(" ", maxChars);
+        if (cut < 1) cut = maxChars;
+        else if (/[.!?;]/.test(rest[cut])) cut += 1;
+        pieces.push(rest.slice(0, cut).trim()); rest = rest.slice(cut).trim();
+      }
+      if (rest) pieces.push(rest);
+      return pieces;
+    }
+
+    async function translatePassageSafely(text, depth = 0) {
+      const result = await greedyTranslate(text, currentLang);
+      const hitOutputLimit = result.tokens.length >= MAX_NEW_TOKENS + 1;
+      if (!hitOutputLimit) return result.final.trim();
+
+      // A result at the hard token limit may have been cut off. Retry as
+      // smaller passages instead of accepting a possibly incomplete sentence.
+      if (depth >= 4 || text.trim().length < 80) {
+        throw new Error("A passage reached the model output limit repeatedly. Try translating a smaller section of the book.");
+      }
+      const smaller = splitForTranslation(text, Math.max(100, Math.floor(text.length / 2)));
+      if (smaller.length < 2) {
+        throw new Error("Could not safely split a long passage; no partial translation was saved.");
+      }
+      const repaired = [];
+      for (const part of smaller) repaired.push(await translatePassageSafely(part, depth + 1));
+      return repaired.join(" ");
+    }
+
+    // --- Persistent translation cache (survives closing the tab) ----------
+    const TC_DB = "anuvaad-translation-cache", TC_STORE = "t";
+    function tcOpen() {
+      return new Promise((res, rej) => {
+        const r = indexedDB.open(TC_DB, 1);
+        r.onupgradeneeded = () => r.result.createObjectStore(TC_STORE);
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      });
+    }
+    async function tcGetMany(db, keys) {
+      return new Promise((res) => {
+        const out = new Map(), tx = db.transaction(TC_STORE, "readonly"), st = tx.objectStore(TC_STORE);
+        for (const k of keys) { const q = st.get(k); q.onsuccess = () => { if (q.result != null) out.set(k, q.result); }; }
+        tx.oncomplete = () => res(out); tx.onerror = () => res(out);
+      });
+    }
+    async function tcPutMany(db, pairs) {
+      return new Promise((res) => {
+        const tx = db.transaction(TC_STORE, "readwrite"), st = tx.objectStore(TC_STORE);
+        for (const [k, v] of pairs) st.put(v, k);
+        tx.oncomplete = () => res(); tx.onerror = () => res();
+      });
+    }
+    async function tcClear() {
+      const db = await tcOpen();
+      return new Promise((res) => { const tx = db.transaction(TC_STORE, "readwrite"); tx.objectStore(TC_STORE).clear(); tx.oncomplete = () => res(); });
+    }
+
+    const $bookStop = $("book-stop"), $bookBatch = $("book-batch"), $speedInfo = $("speed-info");
+    let stopRequested = false;
+    $bookStop.addEventListener("click", () => { stopRequested = true; $bookStop.disabled = true; });
+
+    // Tell the user whether multi-threading is really on.
+    (function showSpeedInfo() {
+      const isolated = typeof crossOriginIsolated !== "undefined" && crossOriginIsolated;
+      const threads = isolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
+      $speedInfo.textContent = isolated
+        ? `Speed: multi-threaded mode ON (${threads} threads).`
+        : "Speed: running on 1 CPU thread because this page isn't cross-origin isolated. Open it via the included serve.py (python serve.py) in Chrome/Edge for roughly 2–3× more speed.";
+    })();
+
+    function fmtTime(sec) {
+      sec = Math.max(0, Math.round(sec));
+      const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+      return h ? `${h}h ${m}m` : `${m}m ${sec % 60}s`;
+    }
+
+    // Translate a list of unique passages in batches. Results are cached.
+    $bookTranslate.addEventListener("click", async () => {
+      if (!modelReady || !bookBlocks.length || bookBusy) return;
+      bookBusy = true; stopRequested = false;
+      $bookTranslate.disabled = true; $bookImport.disabled = true; $bookSave.disabled = true; $bookSaveEpub.disabled = true;
+      $bookStop.disabled = false;
+      translatedBook = ""; translatedBookBlocks = []; $bookOutput.textContent = ""; clearError();
+      const BATCH = parseInt($bookBatch.value, 10) || 8;
+      const lang = currentLang;
+      const hasLetters = (t) => /[A-Za-z\u00C0-\u024F]/.test(t);
+      let db = null;
+      try { db = await tcOpen(); } catch { db = null; }
+
+      try {
+        // 1. Split every block into passages; collect unique ones that need work.
+        const plan = bookBlocks.map((b) => b.chapterBreak ? null : splitForTranslation(b.text));
+        const unique = new Map(); // text -> translation (or undefined)
+        for (const parts of plan) if (parts) for (const p of parts) unique.set(p, undefined);
+        const keyOf = (t) => lang + "|" + t;
+
+        // Passages with no letters (page numbers, "* * *") are copied as-is.
+        for (const t of unique.keys()) if (!hasLetters(t)) unique.set(t, t);
+
+        // Reuse anything translated in an earlier session.
+        let fromCache = 0;
+        if (db) {
+          const need = [...unique.keys()].filter((t) => unique.get(t) === undefined);
+          const hit = await tcGetMany(db, need.map(keyOf));
+          for (const t of need) { const v = hit.get(keyOf(t)); if (v != null) { unique.set(t, v); fromCache++; } }
+        }
+
+        const todo = [...unique.keys()].filter((t) => unique.get(t) === undefined)
+          .sort((a, b) => a.length - b.length); // similar lengths batch together = less padding
+        const totalWork = todo.length;
+        let done = 0; const t0 = performance.now();
+        const report = () => {
+          const el = (performance.now() - t0) / 1000;
+          const eta = done ? (el / done) * (totalWork - done) : 0;
+          $bookProgress.textContent =
+            `Translating passages ${done}/${totalWork}` +
+            (fromCache ? ` (+${fromCache} reused from earlier)` : "") +
+            (done ? ` · about ${fmtTime(eta)} left` : "") +
+            `\nKeep this tab open. Press Stop any time — finished passages are saved and reused next time.`;
+        };
+        report();
+
+        // 2. Batched translation.
+        for (let i = 0; i < todo.length; i += BATCH) {
+          if (stopRequested) break;
+          const group = todo.slice(i, i + BATCH);
+          let results;
+          try {
+            results = await greedyTranslateBatch(group, lang);
+          } catch (e) {
+            console.warn("Batch failed, falling back to single passages:", e);
+            results = group.map(() => ({ truncated: true, final: "" }));
+          }
+          const toSave = [];
+          for (let k = 0; k < group.length; k++) {
+            let text = results[k].final.trim();
+            if (results[k].truncated || !text) text = await translatePassageSafely(group[k]); // slow, safe path
+            unique.set(group[k], text); toSave.push([keyOf(group[k]), text]);
+          }
+          if (db) await tcPutMany(db, toSave);
+          done += group.length; report();
+          $bookOutput.textContent = "Latest: " + group[group.length - 1].slice(0, 80) + "\n→ " + unique.get(group[group.length - 1]);
+          await new Promise((r) => setTimeout(r, 0));
+        }
+
+        if (stopRequested) {
+          $bookProgress.textContent = `Stopped at ${done}/${totalWork} passages. Click “Translate book” again to continue — finished passages are reused.`;
+          return;
+        }
+
+        // 3. Reassemble in original order.
+        const out = [];
+        for (let bi = 0; bi < bookBlocks.length; bi++) {
+          const block = bookBlocks[bi];
+          if (block.chapterBreak) { out.push("\n\n────────────────────\n\n"); translatedBookBlocks.push({ chapterBreak: true }); continue; }
+          const translated = plan[bi].map((p) => unique.get(p)).join(" ");
+          out.push("\n\n" + translated);
+          translatedBookBlocks.push({ text: translated, heading: !!block.heading, tag: block.tag || "p" });
+        }
+        translatedBook = out.join("").trim() + "\n";
+        $bookOutput.textContent = translatedBook;
+        const el = (performance.now() - t0) / 1000;
+        $bookProgress.textContent = `Finished in ${fmtTime(el)}: ${translatedBookBlocks.filter(b => !b.chapterBreak).length} blocks translated to ${TARGET_LANGS.find(l => l[0] === lang)?.[2] || lang}. Save the result below.`;
+        $bookSave.disabled = false; $bookSaveEpub.disabled = false;
+      } catch (e) {
+        $bookProgress.textContent = "Book translation stopped: " + e.message + "\nFinished passages are saved — click Translate book to continue.";
+        console.error(e);
+      } finally {
+        bookBusy = false; $bookStop.disabled = true;
+        $bookTranslate.disabled = !bookBlocks.length || !modelReady; $bookImport.disabled = false;
+      }
+    });
+    $bookSave.addEventListener("click", () => {
+      if (!translatedBook) return;
+      const blob = new Blob([translatedBook], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob); const a = document.createElement("a");
+      const original = ($bookFile.files?.[0]?.name || "book").replace(/\.epub$/i, "");
+      a.href = url; a.download = original + "-marathi.txt"; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+
+    // Build a simple standards-based EPUB locally. ZIP entries are stored (not
+    // compressed) so no extra library or download is required.
+    function xmlEscape(value) {
+      return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+    }
+    function makeEpubDocuments(blocks) {
+      const sections = [];
+      let current = [];
+      for (const block of blocks) {
+        if (block.chapterBreak) {
+          if (current.length) sections.push(current);
+          current = [];
+        } else if (block.text) current.push(block);
+      }
+      if (current.length) sections.push(current);
+      if (!sections.length) throw new Error("No translated chapter text is available.");
+
+      const chapters = sections.map((items, idx) => {
+        const body = items.map(item => {
+          const safe = xmlEscape(item.text);
+          const tag = item.heading ? "h2" : "p";
+          return `<${tag}>${safe}</${tag}>`;
+        }).join("\\n");
+        return { id: `chapter${idx + 1}`, file: `chapter${idx + 1}.xhtml`,
+          title: `Chapter ${idx + 1}`, content: `<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="mr"><head><title>Chapter ${idx + 1}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body>${body}</body></html>` };
+      });
+      const manifest = chapters.map(c => `<item id="${c.id}" href="${c.file}" media-type="application/xhtml+xml"/>`).join("");
+      const spine = chapters.map(c => `<itemref idref="${c.id}"/>`).join("");
+      const opf = `<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="mr"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="bookid">urn:uuid:${crypto.randomUUID ? crypto.randomUUID() : Date.now()}</dc:identifier><dc:title>${xmlEscape(bookMetadata.title ? bookMetadata.title + " — मराठी अनुवाद" : "मराठी अनुवाद")}</dc:title>${bookMetadata.author ? `<dc:creator>${xmlEscape(bookMetadata.author)}</dc:creator>` : ""}<dc:language>mr</dc:language><meta property="dcterms:modified">${new Date().toISOString().replace(/\\.\\d{3}Z$/, "Z")}</meta></metadata><manifest><item id="nav" href="nav.xhtml" properties="nav" media-type="application/xhtml+xml"/><item id="css" href="style.css" media-type="text/css"/>${manifest}</manifest><spine>${spine}</spine></package>`;
+      const navItems = chapters.map(c => `<li><a href="${c.file}">${xmlEscape(c.title)}</a></li>`).join("");
+      const nav = `<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="mr"><head><title>अनुक्रमणिका</title></head><body><nav epub:type="toc" id="toc"><h1>अनुक्रमणिका</h1><ol>${navItems}</ol></nav></body></html>`;
+      const css = `body{font-family:serif;line-height:1.7;margin:5%;}h2{text-align:center;margin:1.5em 0;}p{margin:0 0 1em;text-indent:1em;}`;
+      return [
+        {name:"mimetype", data:"application/epub+zip"},
+        {name:"META-INF/container.xml", data:'<?xml version="1.0" encoding="UTF-8"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>'},
+        {name:"OEBPS/content.opf", data:opf},
+        {name:"OEBPS/nav.xhtml", data:nav},
+        {name:"OEBPS/style.css", data:css},
+        ...chapters.map(c => ({name:`OEBPS/${c.file}`, data:c.content}))
+      ];
+    }
+    function crc32(bytes) {
+      let crc = -1;
+      for (const b of bytes) {
+        crc ^= b;
+        for (let k = 0; k < 8; k++) crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1));
+      }
+      return (crc ^ -1) >>> 0;
+    }
+    function zipStored(files) {
+      const enc = new TextEncoder(), localParts = [], centralParts = [];
+      let offset = 0;
+      const dt = new Date(), dosTime = (dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1);
+      const dosDate = ((Math.max(1980,dt.getFullYear())-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
+      for (const file of files) {
+        const name = enc.encode(file.name), data = typeof file.data === "string" ? enc.encode(file.data) : file.data;
+        const crc = crc32(data), local = new Uint8Array(30 + name.length + data.length), lv = new DataView(local.buffer);
+        lv.setUint32(0,0x04034b50,true); lv.setUint16(4,20,true); lv.setUint16(6,0x0800,true);
+        lv.setUint16(8,0,true); lv.setUint16(10,dosTime,true); lv.setUint16(12,dosDate,true);
+        lv.setUint32(14,crc,true); lv.setUint32(18,data.length,true); lv.setUint32(22,data.length,true);
+        lv.setUint16(26,name.length,true); lv.setUint16(28,0,true);
+        local.set(name,30); local.set(data,30+name.length); localParts.push(local);
+        const central = new Uint8Array(46+name.length), cv = new DataView(central.buffer);
+        cv.setUint32(0,0x02014b50,true); cv.setUint16(4,20,true); cv.setUint16(6,20,true);
+        cv.setUint16(8,0x0800,true); cv.setUint16(10,0,true); cv.setUint16(12,dosTime,true); cv.setUint16(14,dosDate,true);
+        cv.setUint32(16,crc,true); cv.setUint32(20,data.length,true); cv.setUint32(24,data.length,true);
+        cv.setUint16(28,name.length,true); cv.setUint16(30,0,true); cv.setUint16(32,0,true);
+        cv.setUint16(34,0,true); cv.setUint16(36,0,true); cv.setUint32(38,0,true); cv.setUint32(42,offset,true);
+        central.set(name,46); centralParts.push(central); offset += local.length;
+      }
+      const centralSize = centralParts.reduce((n,b)=>n+b.length,0);
+      const end = new Uint8Array(22), ev = new DataView(end.buffer);
+      ev.setUint32(0,0x06054b50,true); ev.setUint16(4,0,true); ev.setUint16(6,0,true);
+      ev.setUint16(8,files.length,true); ev.setUint16(10,files.length,true);
+      ev.setUint32(12,centralSize,true); ev.setUint32(16,offset,true); ev.setUint16(20,0,true);
+      return new Blob([...localParts,...centralParts,end],{type:"application/epub+zip"});
+    }
+    $bookSaveEpub.addEventListener("click", () => {
+      if (!translatedBook) return;
+      try {
+        const blob = zipStored(makeEpubDocuments(translatedBookBlocks));
+        const url = URL.createObjectURL(blob), a = document.createElement("a");
+        const original = ($bookFile.files?.[0]?.name || "book").replace(/\.epub$/i, "");
+        a.href = url; a.download = original + "-marathi.epub";
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+        $bookProgress.textContent = "Marathi EPUB created with the source title, author (when available), chapter headings, and table of contents. Original images, cover art, and exact styling are still not retained.";
+      } catch (e) {
+        $bookProgress.textContent = "EPUB export failed: " + e.message;
+        console.error(e);
+      }
+    });
+
+    // --- Boot ------------------------------------------------------------
+    (async () => {
+      try {
+        $progress.classList.add("visible");
+        setStatus("loading", "Downloading model (1.3 GB, one-time)…");
+        await loadModel();
+      } catch (e) {
+        showError("Failed to load model: " + e.message);
+        setStatus("error", "Error");
+        console.error(e);
+      }
+    })();
+  </script>
+</body>
+</html>
